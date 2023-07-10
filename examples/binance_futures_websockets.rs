@@ -21,7 +21,7 @@ fn market_websocket() {
     let keep_running = AtomicBool::new(true);
     let stream_examples_usd_m = vec![
         // taken from https://binance-docs.github.io/apidocs/futures/en/#websocket-market-streams
-        "btcusdt@depth@0ms",                     // <symbol>@aggTrade
+        "btcusdt@depth@0ms"
     ];
 
     let callback_fn = |event: FuturesWebsocketEvent| {
