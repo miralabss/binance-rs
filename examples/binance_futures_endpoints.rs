@@ -4,14 +4,18 @@ use binance::futures::market::*;
 use binance::futures::model::*;
 use binance::errors::ErrorKind as BinanceLibErrorKind;
 
-fn main() {
-    general();
-    //account();
-    market_data();
+static mut general: FuturesGeneral = None;
+
+#[no_mangle]
+pub extern "C" fn exchange_info() -> binance::errors::Result<ExchangeInformation> {
+    general.exchange_info()
 }
 
-fn general() {
-    let general: FuturesGeneral = Binance::new(None, None);
+fn main() {
+    f_general();
+}
+
+fn f_general() {
 
     match general.ping() {
         Ok(answer) => println!("{:?}", answer),
