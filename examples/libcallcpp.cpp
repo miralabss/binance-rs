@@ -1,6 +1,6 @@
-#include <stdio.h>
+#include <iostream>
 
 extern "C"
 void callApiEndpointFromRust(char* str) {
-    printf("Received from Rust : %s\n", str);
+    std::cout << str << std::endl;
 }
