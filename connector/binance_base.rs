@@ -6,9 +6,6 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use serde_json::{Result, Value};
 
-fn main() {
-    market_websocket();
-}
 extern {
     fn rustMessageHandler(name: *const c_char);
 }
