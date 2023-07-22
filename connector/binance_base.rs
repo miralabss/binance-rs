@@ -6,38 +6,6 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use serde_json::{Result, Value};
 
-extern {
-    fn rustMessageHandler(name: *const c_char);
-}
-
-#[link(name = "callcpp", kind = "dylib")]
-extern "C" {}
-
-#[no_mangle]
-pub extern "C"  
-
-fn cppMessageHandler(msg: *const c_char) {
-
-    unsafe {
-        let c_str_msg = CStr::from_ptr(msg);
-        let rust_str_msg = c_str_msg.to_str().unwrap();
-        
-        let rust_args: Value = serde_json::from_str(rust_str_msg).unwrap();
-
-        if rust_args["cmd"] == "new_order" {
-            
-        } else if rust_args["cmd"] == "ws_start" {
-
-        } else if rust_args["cmd"] == "batch_new_order" {
-
-        } else if rust_args["cmd"] == "cancel_all_orders" {
-
-        } else if rust_args["cmd"] == "exchange_info" {
-
-        }
-    }
-}
-
 fn market_websocket() {
     // Example to show the future market websockets. It will print one event for each
     // endpoint and continue to the next.
