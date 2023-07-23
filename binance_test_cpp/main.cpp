@@ -3,12 +3,26 @@
 
 
 // Globals
-typedef char* (*FUNC_RustFromCpp)(const char*);
-typedef char* (*FUNC_CppFromRust)(const char*);
-typedef int (*FUNC_InitFromCpp)(FUNC_CppFromRust);
+typedef char* (*F_C_STR)(const char*);
+typedef char* (*F_0_C_STR)();
+typedef char* (*F_1_C_STR)(const char*);
+typedef char* (*F_2_C_STR)(const char*, const char*);
+typedef char* (*F_8_C_STR)(const char*, const char*, const char*, const char*, const char*, const char*, const char*, const char*);
+typedef int (*F_RUST_WITH_CB)(F_C_STR);
 
-FUNC_RustFromCpp gFunc_rustFromCpp = NULL;
-FUNC_InitFromCpp gFunc_initFromCpp = NULL;
+F_RUST_WITH_CB init_from_cpp = NULL;
+F_C_STR rust_from_cpp = NULL;
+F_C_STR cpp_from_rust = NULL;
+
+F_RUST_WITH_CB ws_order_book_rs = NULL;
+F_2_C_STR cancel_order_with_client_id_rs = NULL;
+F_2_C_STR cancel_order_rs = NULL;
+F_8_C_STR new_order_rs = NULL;
+F_0_C_STR exchange_info_rs = NULL;
+F_2_C_STR get_custom_depth_rs = NULL;
+F_1_C_STR get_price_rs = NULL;
+F_1_C_STR get_book_ticker_rs = NULL;
+
 void* gHandler_LibBinance = NULL;
 
 char* cppFromRust(const char* s) {
@@ -16,48 +30,73 @@ char* cppFromRust(const char* s) {
     return NULL;
 }
 
-int initRust() {
-    gHandler_LibBinance = dlopen("./libbinance.so", RTLD_NOW);
-    if (gHandler_LibBinance) {
-        gFunc_initFromCpp = (FUNC_InitFromCpp) dlsym(gHandler_LibBinance, "initFromCpp");
-        if (gFunc_initFromCpp) {
-            printf("Success to load (%s)\n", "initFromCpp");
-        } else {
-            printf("Error : symbol not found (%s) \n", "initFromCpp");
-            return -1;
-        }
-
-        gFunc_rustFromCpp = (FUNC_RustFromCpp) dlsym(gHandler_LibBinance, "rustFromCpp");
-        if (gFunc_rustFromCpp) {
-            printf("Success to load (%s)\n", "rustFromCpp");
-
-        } else {
-            printf("Error: symbol not found (%s)\n", "rustFromCpp");
-            return -1;
-        }
+template <typename T>
+int handler_dlsym(T f, void *__handle, const char *__symbol) {
+    void* ptr = dlsym(__handle, __symbol);
+    if (ptr) {
+        f = (T) ptr;
+        return 0;
     } else {
+        printf("Error: symbol not found (%s)\n", __symbol);
+        return -1;
+    }
+}
+
+int load_library() {
+    gHandler_LibBinance = dlopen("./libbinance.so", RTLD_NOW);
+    if (!gHandler_LibBinance) {
         printf("Error: failed to load library\n");
+        return -1;
+    }
+    if (handler_dlsym(init_from_cpp, gHandler_LibBinance, "init_from_cpp")) {
+        return -1;
+    }
+    if (handler_dlsym(rust_from_cpp, gHandler_LibBinance, "rust_from_cpp")) {
+        return -1;
+    }
+    if (handler_dlsym(cpp_from_rust, gHandler_LibBinance, "cpp_from_rust")) {
+        return -1;
+    }
+    if (handler_dlsym(ws_order_book_rs, gHandler_LibBinance, "ws_order_book_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(cancel_order_with_client_id_rs, gHandler_LibBinance, "cancel_order_with_client_id_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(cancel_order_rs, gHandler_LibBinance, "cancel_order_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(new_order_rs, gHandler_LibBinance, "new_order_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(exchange_info_rs, gHandler_LibBinance, "exchange_info_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(get_custom_depth_rs, gHandler_LibBinance, "get_custom_depth_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(get_price_rs, gHandler_LibBinance, "get_price_rs")) {
+        return -1;
+    }
+    if (handler_dlsym(get_book_ticker_rs, gHandler_LibBinance, "get_book_ticker_rs")) {
         return -1;
     }
     return 0;
 }
 
-int exitRust() {
+int close_library() {
     dlclose(gHandler_LibBinance);
     return 0;
 }
 
 int main() {
-    if (initRust()) {
+    if (load_library()) {
         printf("Fail to init rust library\n");
         return -1;
     }
 
-    gFunc_initFromCpp(cppFromRust);
-    char* result = NULL;
-    result = gFunc_rustFromCpp("new_order");
-    result = gFunc_rustFromCpp("exchange_info");
+    printf("%s\n", get_custom_depth_rs("BTCUSDT", "5"));
 
-    exitRust();
+    close_library();
 }
 
