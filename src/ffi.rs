@@ -37,7 +37,7 @@ pub fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn initFromCpp(callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
+pub extern "C" fn init_from_cpp(callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
     unsafe {
         FUNC_CPP_FROM_RUST = callback;
         init();
@@ -46,7 +46,7 @@ pub extern "C" fn initFromCpp(callback: extern fn(_: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn wsOrderBook(callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_order_book(callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
         callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *mut c_char);
         Ok(())
@@ -62,20 +62,7 @@ pub extern "C" fn wsOrderBook(callback: extern fn(_: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-//pub fn limit_buy<S, F>(&self, symbol: S, qty: F, price: f64) -> Result<Transaction>
-pub extern "C" fn limit_buy_rs(symbol: *const c_char, qty: *const c_char, price: *const c_char) -> *mut c_char {
-    unsafe {
-        let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
-        let rs_qty = CStr::from_ptr(qty).to_str().unwrap();
-        let rs_price = CStr::from_ptr(price).to_str().unwrap();
-        
-        let res = format!("{:?}", ACCOUNT.as_mut().unwrap().limit_buy(rs_symbol, rs_qty.parse::<f64>().unwrap(), rs_price.parse::<f64>().unwrap()));
-        CString::new(res).unwrap().into_raw() as *mut c_char
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn rustFromCpp(s: *const c_char) -> *mut c_char {
+pub extern "C" fn rust_from_cpp(s: *const c_char) -> *mut c_char {
     unsafe {
         // let c_str = CStr::from_ptr(s);
         // let rust_str = c_str.to_str().unwrap();
