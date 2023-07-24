@@ -46,15 +46,19 @@ pub extern "C" fn init_from_cpp(callback: extern fn(_: *const c_char) -> *mut c_
 }
 
 #[no_mangle]
-pub extern "C" fn ws_order_book(callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_order_book_rs(symbol: *const c_char, callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *mut c_char);
+        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char);
         Ok(())
     };
+    let rs_symbol: String;
+    unsafe {
+        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth@0ms";
+    }
     let keep_running = AtomicBool::new(true);
     let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
     web_socket
-        .connect(&FuturesMarket::USDM, "depth@0ms")
+        .connect(&FuturesMarket::USDM, &rs_symbol)
         .unwrap();
     web_socket.event_loop(&keep_running).unwrap();
     web_socket.disconnect().unwrap();
@@ -145,11 +149,10 @@ pub extern "C" fn exchange_info_rs() -> *mut c_char {
 
 #[no_mangle]
 // pub fn get_custom_depth<S>(&self, symbol: S, depth: u64) -> Result<OrderBook>
-pub extern "C" fn get_custom_depth_rs(symbol: *const c_char, depth: *const c_char) -> *mut c_char {
+pub extern "C" fn get_custom_depth_rs(symbol: *const c_char, depth: *const c_char) -> *mut c_char {    
     unsafe {
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
         let rs_depth = CStr::from_ptr(depth).to_str().unwrap();
-
         let res = format!("{:?}", MARKET.as_mut().unwrap().get_custom_depth(rs_symbol, rs_depth.parse::<u64>().unwrap()));
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
