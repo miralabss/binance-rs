@@ -220,7 +220,7 @@ fn build_custom_order(
 
         if rs_order_type_str != "stop_market" && rs_order_type_str != "take_profit_market" {
             if rs_order_type_str != "stop" && rs_order_type_str != "take_profit" {
-                stop_price = None;
+                rs_stop_price = None;
             }
             rs_close_position = None;
         }
