@@ -154,7 +154,7 @@ fn build_custom_order(
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
 
         let rs_qty_str = CStr::from_ptr(qty).to_str().unwrap();
-        let rs_qty = match rs_qty_str {
+        let mut rs_qty = match rs_qty_str {
             "" => None,
             _ => Some(rs_qty_str.parse::<f64>().unwrap()),
         };
@@ -166,20 +166,20 @@ fn build_custom_order(
         };
 
         let rs_stop_price_str = CStr::from_ptr(stop_price).to_str().unwrap();
-        let rs_stop_price = match rs_stop_price_str {
+        let mut rs_stop_price = match rs_stop_price_str {
             "" => None,
             _ => Some(rs_stop_price_str.parse::<f64>().unwrap()),
         };
 
         let rs_callback_rate_str = CStr::from_ptr(callback_rate).to_str().unwrap();
-        let rs_callback_rate = match rs_callback_rate_str {
+        let mut rs_callback_rate = match rs_callback_rate_str {
             "" => None,
             _ => Some(rs_callback_rate_str.parse::<f64>().unwrap()),
         };
 
 
         let rs_activation_price_str = CStr::from_ptr(activation_price).to_str().unwrap();
-        let rs_activation_price = match rs_activation_price_str {
+        let mut rs_activation_price = match rs_activation_price_str {
             "" => None,
             _ => Some(rs_activation_price_str.parse::<f64>().unwrap()),
         };
@@ -213,7 +213,7 @@ fn build_custom_order(
         };
 
         let rs_close_position_str: &str = CStr::from_ptr(close_position).to_str().unwrap();
-        let rs_close_position = match rs_close_position_str {
+        let mut rs_close_position = match rs_close_position_str {
             "" => None,
             _ => Some(rs_close_position_str.parse::<bool>().unwrap()),
         };
