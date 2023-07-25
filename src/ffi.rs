@@ -1,6 +1,6 @@
 use std::ffi::{CStr, CString};
 // use crate::futures::websockets::*;
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_void};
 // use serde_json::Value;
 use crate::futures::account::*;
 use crate::api::Binance;
@@ -43,9 +43,9 @@ pub extern "C" fn init_from_cpp(callback: extern fn(_: *const c_char) -> *mut c_
 }
 
 #[no_mangle]
-pub extern "C" fn ws_order_book_rs(symbol: *const c_char, callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_order_book_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char);
+        callback(CString::new(format!("{:?}", event), data).unwrap().into_raw() as *const c_char);
         Ok(())
     };
     let rs_symbol: String;
@@ -63,9 +63,9 @@ pub extern "C" fn ws_order_book_rs(symbol: *const c_char, callback: extern fn(_:
 }
 
 #[no_mangle]
-pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char, callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char);
+        callback(CString::new(format!("{:?}", event), data).unwrap().into_raw() as *const c_char);
         Ok(())
     };
     let rs_symbol: String;
@@ -83,9 +83,9 @@ pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char, callback: extern fn(_: 
 }
 
 #[no_mangle]
-pub extern "C" fn ws_mark_price_rs(symbol: *const c_char, callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_mark_price_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char);
+        callback(CString::new(format!("{:?}", event), data).unwrap().into_raw() as *const c_char);
         Ok(())
     };
     let rs_symbol: String;
@@ -217,6 +217,22 @@ fn build_custom_order(
             "" => None,
             _ => Some(rs_close_position_str.parse::<bool>().unwrap()),
         };
+
+        if rs_order_type != "stop_market" && rs_order_type != "take_profit_market" {
+            if rs_order_type != "stop" && rs_order_type != "take_profit" {
+                stop_price = None;
+            }
+            rs_close_position = None;
+        }
+
+        if rs_order_type != "trailing_stop_market" {
+            rs_callback_rate = None;
+            rs_activation_price = None;
+        }
+
+        if rs_close_position == Some(true) {
+            rs_qty = None;
+        }
         
         CustomOrderRequest {
             symbol: rs_symbol.to_owned(),
