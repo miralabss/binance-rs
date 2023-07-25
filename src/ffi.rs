@@ -45,7 +45,7 @@ pub extern "C" fn init_from_cpp(callback: extern fn(_: *const c_char) -> *mut c_
 #[no_mangle]
 pub extern "C" fn ws_order_book_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event), data).unwrap().into_raw() as *const c_char);
+        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
     let rs_symbol: String;
@@ -65,7 +65,7 @@ pub extern "C" fn ws_order_book_rs(symbol: *const c_char, data: *mut c_void, cal
 #[no_mangle]
 pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event), data).unwrap().into_raw() as *const c_char);
+        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
     let rs_symbol: String;
@@ -85,7 +85,7 @@ pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char, data: *mut c_void, call
 #[no_mangle]
 pub extern "C" fn ws_mark_price_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event), data).unwrap().into_raw() as *const c_char);
+        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
     let rs_symbol: String;
@@ -218,14 +218,14 @@ fn build_custom_order(
             _ => Some(rs_close_position_str.parse::<bool>().unwrap()),
         };
 
-        if rs_order_type != "stop_market" && rs_order_type != "take_profit_market" {
-            if rs_order_type != "stop" && rs_order_type != "take_profit" {
+        if rs_order_type_str != "stop_market" && rs_order_type_str != "take_profit_market" {
+            if rs_order_type_str != "stop" && rs_order_type_str != "take_profit" {
                 stop_price = None;
             }
             rs_close_position = None;
         }
 
-        if rs_order_type != "trailing_stop_market" {
+        if rs_order_type_str != "trailing_stop_market" {
             rs_callback_rate = None;
             rs_activation_price = None;
         }
