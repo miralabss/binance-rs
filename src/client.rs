@@ -93,6 +93,18 @@ impl Client {
         self.handler(response)
     }
 
+    pub fn put_signed<T: DeserializeOwned>(&self, endpoint: API, request: String) -> Result<T> {
+        let url = self.sign_request(endpoint, Some(request));
+
+        let client = &self.inner_client;
+        let response = client
+            .put(url.as_str())
+            .headers(self.build_headers(false)?)
+            .send()?;
+
+        self.handler(response)
+    }
+
     pub fn put<T: DeserializeOwned>(&self, endpoint: API, listen_key: &str) -> Result<T> {
         let url: String = format!("{}{}", self.host, String::from(endpoint));
         let data: String = format!("listenKey={}", listen_key);

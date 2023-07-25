@@ -14,6 +14,19 @@ pub fn build_request(parameters: BTreeMap<String, String>) -> String {
     request
 }
 
+pub fn build_json(parameters: BTreeMap<String, String>) -> String {
+    let mut request = String::new();
+    request.push_str("{");
+    for (key, value) in parameters {
+        let param = format!("\"{}\":\"{}\",", key, value);
+        request.push_str(param.as_ref());
+    }
+    request.pop();
+    request.push_str("}");
+    request
+
+}
+
 pub fn build_signed_request(
     parameters: BTreeMap<String, String>, recv_window: u64,
 ) -> Result<String> {
