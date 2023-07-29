@@ -7,6 +7,7 @@ use crate::api::Binance;
 use crate::account::OrderSide;
 use crate::futures::general::FuturesGeneral;
 use crate::futures::websockets::*;
+use crate::futures::userstream::*;
 use std::sync::atomic::AtomicBool;
 
 extern fn dummy(_: *const c_char) -> *mut c_char {
@@ -19,7 +20,6 @@ static mut SECRET_KEY: Option<String> = None;
 static mut ACCOUNT: Option<FuturesAccount> = None;
 static mut GENERAL: Option<FuturesGeneral> = None;
 static mut MARKET: Option<crate::futures::market::FuturesMarket> = None;
-
 ///
 /// Must be called at beginning
 /// 
@@ -59,6 +59,38 @@ pub extern "C" fn ws_order_book_rs(symbol: *const c_char, data: *mut c_void, cal
         .unwrap();
     web_socket.event_loop(&keep_running).unwrap();
     web_socket.disconnect().unwrap();
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn ws_userdata(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
+    let keep_running = AtomicBool::new(true); 
+    let user_stream: FuturesUserStream;
+    unsafe {
+        user_stream = Binance::new(API_KEY.clone(), SECRET_KEY.clone());
+    }
+    if let Ok(answer) = user_stream.start() {
+        let listen_key = answer.listen_key;
+    
+        let mut web_socket = FuturesWebSockets::new(|event: FuturesWebsocketEvent| {
+            callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
+            Ok(())
+        });
+
+        web_socket.connect(&FuturesMarket::USDM, &listen_key).unwrap(); // check error
+        if let Err(e) = web_socket.event_loop(&keep_running) {
+            match e {
+                err => {
+                    println!("Error: {:?}", err);
+                }
+            }
+        }
+        return 0;
+    } else {
+        println!("Not able to start an User Stream (Check your API_KEY)");
+        return 1;
+    }
+    
     0
 }
 
