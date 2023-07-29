@@ -63,7 +63,7 @@ pub extern "C" fn ws_order_book_rs(symbol: *const c_char, data: *mut c_void, cal
 }
 
 #[no_mangle]
-pub extern "C" fn ws_userdata(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_userdata_rs(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let keep_running = AtomicBool::new(true); 
     let user_stream: FuturesUserStream;
     unsafe {
