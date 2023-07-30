@@ -9,6 +9,8 @@ use crate::futures::general::FuturesGeneral;
 use crate::futures::websockets::*;
 use crate::futures::userstream::*;
 use std::sync::atomic::AtomicBool;
+use std::thread;
+use std::time::Duration;
 
 extern fn dummy(_: *const c_char) -> *mut c_char {
     std::ptr::null_mut()
@@ -71,6 +73,7 @@ pub extern "C" fn ws_userdata_rs(data: *mut c_void, callback: extern fn(_: *cons
     }
     if let Ok(answer) = user_stream.start() {
         let listen_key = answer.listen_key;
+        let listen_key_clone = listen_key.clone();
     
         let mut web_socket = FuturesWebSockets::new(|event: FuturesWebsocketEvent| {
             callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
@@ -78,6 +81,18 @@ pub extern "C" fn ws_userdata_rs(data: *mut c_void, callback: extern fn(_: *cons
         });
 
         web_socket.connect(&FuturesMarket::USDM, &listen_key).unwrap(); // check error
+
+        thread::spawn(move || {
+        loop {
+                thread::sleep(Duration::from_secs(1800));
+                match user_stream.keep_alive(&listen_key_clone) {
+                    Ok(msg) => continue,
+                    Err(e) => break,
+                }
+            }
+        });
+    
+
         if let Err(e) = web_socket.event_loop(&keep_running) {
             match e {
                 err => {
