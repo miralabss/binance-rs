@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::ffi::{CStr, CString};
 // use crate::futures::websockets::*;
 use std::os::raw::{c_char, c_void};
@@ -22,6 +23,7 @@ static mut SECRET_KEY: Option<String> = None;
 static mut ACCOUNT: Option<FuturesAccount> = None;
 static mut GENERAL: Option<FuturesGeneral> = None;
 static mut MARKET: Option<crate::futures::market::FuturesMarket> = None;
+static mut STREAMS: Vec<String> = vec![];
 ///
 /// Must be called at beginning
 /// 
@@ -45,27 +47,55 @@ pub extern "C" fn init_from_cpp(callback: extern fn(_: *const c_char) -> *mut c_
 }
 
 #[no_mangle]
-pub extern "C" fn ws_order_book_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_order_book_rs(symbol: *const c_char) -> i32 {
+    let rs_symbol: String;
+    unsafe {
+        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth@0ms";
+        STREAMS.push(rs_symbol);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char) -> i32 {
+    let rs_symbol: String;
+    unsafe {
+        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@aggTrade";
+        STREAMS.push(rs_symbol);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn ws_mark_price_rs(symbol: *const c_char) -> i32 {
+    let rs_symbol: String;
+    unsafe {
+        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@markPrice";
+        STREAMS.push(rs_symbol);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
         callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
-    let rs_symbol: String;
-    unsafe {
-        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth@0ms";
-    }
     let keep_running = AtomicBool::new(true);
     let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
-    web_socket
-        .connect(&FuturesMarket::USDM, &rs_symbol)
-        .unwrap();
+    unsafe {
+        web_socket
+            .connect_multiple_streams(&FuturesMarket::USDM, STREAMS.borrow())
+            .unwrap();
+    }
     web_socket.event_loop(&keep_running).unwrap();
     web_socket.disconnect().unwrap();
     0
 }
 
 #[no_mangle]
-pub extern "C" fn ws_userdata_rs(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_user_data_rs(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let keep_running = AtomicBool::new(true); 
     let user_stream: FuturesUserStream;
     unsafe {
@@ -105,48 +135,6 @@ pub extern "C" fn ws_userdata_rs(data: *mut c_void, callback: extern fn(_: *cons
         println!("Not able to start an User Stream (Check your API_KEY)");
         return 1;
     }
-    
-    0
-}
-
-#[no_mangle]
-pub extern "C" fn ws_agg_trade_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
-    let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
-        Ok(())
-    };
-    let rs_symbol: String;
-    unsafe {
-        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@aggTrade";
-    }
-    let keep_running = AtomicBool::new(true);
-    let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
-    web_socket
-        .connect(&FuturesMarket::USDM, &rs_symbol)
-        .unwrap();
-    web_socket.event_loop(&keep_running).unwrap();
-    web_socket.disconnect().unwrap();
-    0
-}
-
-#[no_mangle]
-pub extern "C" fn ws_mark_price_rs(symbol: *const c_char, data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
-    let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
-        Ok(())
-    };
-    let rs_symbol: String;
-    unsafe {
-        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@markPrice";
-    }
-    let keep_running = AtomicBool::new(true);
-    let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
-    web_socket
-        .connect(&FuturesMarket::USDM, &rs_symbol)
-        .unwrap();
-    web_socket.event_loop(&keep_running).unwrap();
-    web_socket.disconnect().unwrap();
-    0
 }
 
 #[no_mangle]
@@ -169,7 +157,11 @@ pub extern "C" fn cancel_order_with_client_id_rs(symbol: *const c_char, orig_cli
         let str_slice = cstr.to_str().expect("Invalid UTF-8 string");
         let rs_orig_client_order_id: String = String::from(str_slice);
         
-        let res = format!("{:?}", ACCOUNT.as_mut().unwrap().cancel_order_with_client_id(rs_symbol, rs_orig_client_order_id));
+        let res= match ACCOUNT.as_mut().unwrap().cancel_order_with_client_id(rs_symbol, rs_orig_client_order_id) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -181,7 +173,11 @@ pub extern "C" fn cancel_order_rs(symbol: *const c_char, order_id: *const c_char
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
         let rs_order_id: &str = CStr::from_ptr(order_id).to_str().unwrap();
         
-        let res = format!("{:?}", ACCOUNT.as_mut().unwrap().cancel_order(rs_symbol, rs_order_id.parse::<u64>().unwrap()));
+        let res = match ACCOUNT.as_mut().unwrap().cancel_order(rs_symbol, rs_order_id.parse::<u64>().unwrap()) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -238,10 +234,16 @@ fn build_custom_order(
             &_ => panic!("unknown order side"),
         };
 
+        let rs_reduce_only = match rs_order_type_str {
+            "limit_maker" => Some(true),
+            &_ => None,
+        };
+
         let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
         let rs_order_type = match rs_order_type_str {
             "market" => OrderType::Market,
             "limit" => OrderType::Limit,
+            "limit_maker" => OrderType::Limit,
             "stop" => OrderType::Stop,
             "stop_market" => OrderType::StopMarket,
             "take_profit" => OrderType::TakeProfit,
@@ -288,7 +290,7 @@ fn build_custom_order(
             order_type: rs_order_type,
             time_in_force: rs_time_in_force,
             qty: rs_qty,
-            reduce_only: None,
+            reduce_only: rs_reduce_only,
             price: rs_price,
             stop_price: rs_stop_price,
             close_position: rs_close_position,
@@ -314,11 +316,13 @@ pub extern "C" fn custom_order_rs(
                     activation_price: *const c_char,
                     callback_rate: *const c_char,
                     close_position: *const c_char) -> *mut c_char {
-    let res: String;
     unsafe {
-        res = format!("{:?}", ACCOUNT.as_mut().unwrap().custom_order(build_custom_order(symbol, order_type, order_side, qty, price, stop_price, time_in_force, activation_price, callback_rate, close_position)));
+        let res = match ACCOUNT.as_mut().unwrap().custom_order(build_custom_order(symbol, order_type, order_side, qty, price, stop_price, time_in_force, activation_price, callback_rate, close_position)) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+        CString::new(res).unwrap().into_raw() as *mut c_char
     }
-    CString::new(res).unwrap().into_raw() as *mut c_char
 }
 
 
@@ -326,7 +330,10 @@ pub extern "C" fn custom_order_rs(
 // pub fn exchange_info(&self) -> Result<ExchangeInformation>
 pub extern "C" fn exchange_info_rs() -> *mut c_char {
     unsafe {
-        let res = format!("{:?}", GENERAL.as_mut().unwrap().exchange_info());
+        let res = match GENERAL.as_mut().unwrap().exchange_info() {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -335,7 +342,11 @@ pub extern "C" fn exchange_info_rs() -> *mut c_char {
 // pub fn exchange_info(&self) -> Result<ExchangeInformation>
 pub extern "C" fn account_balance_rs() -> *mut c_char {
     unsafe {
-        let res = format!("{:?}", ACCOUNT.as_mut().unwrap().account_balance());
+        let res = match ACCOUNT.as_mut().unwrap().account_balance() {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -345,7 +356,12 @@ pub extern "C" fn account_balance_rs() -> *mut c_char {
 pub extern "C" fn cancel_all_open_orders_rs(symbol: *const c_char) -> *mut c_char {
     unsafe {
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
-        let res = format!("{:?}", ACCOUNT.as_mut().unwrap().cancel_all_open_orders(rs_symbol));
+
+        let res = match ACCOUNT.as_mut().unwrap().cancel_all_open_orders(rs_symbol) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -356,7 +372,12 @@ pub extern "C" fn get_custom_depth_rs(symbol: *const c_char, depth: *const c_cha
     unsafe {
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
         let rs_depth = CStr::from_ptr(depth).to_str().unwrap();
-        let res = format!("{:?}", MARKET.as_mut().unwrap().get_custom_depth(rs_symbol, rs_depth.parse::<u64>().unwrap()));
+
+        let res = match MARKET.as_mut().unwrap().get_custom_depth(rs_symbol, rs_depth.parse::<u64>().unwrap()) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -367,7 +388,11 @@ pub extern "C" fn get_price_rs(symbol: *const c_char) -> *mut c_char {
     unsafe {
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
 
-        let res = format!("{:?}", MARKET.as_mut().unwrap().get_price(rs_symbol));
+        let res = match MARKET.as_mut().unwrap().get_price(rs_symbol) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
@@ -378,7 +403,11 @@ pub extern "C" fn get_book_ticker_rs(symbol: *const c_char) -> *mut c_char {
     unsafe {
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
 
-        let res = format!("{:?}", MARKET.as_mut().unwrap().get_book_ticker(rs_symbol));
+        let res = match MARKET.as_mut().unwrap().get_book_ticker(rs_symbol) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+        };
+
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
 }
