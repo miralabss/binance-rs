@@ -79,9 +79,19 @@ pub extern "C" fn ws_mark_price_rs(symbol: *const c_char) -> i32 {
 #[no_mangle]
 pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |event: FuturesWebsocketEvent| {
-        callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
+        let ctype = match event {
+            FuturesWebsocketEvent::DepthOrderBook(_) => "depth",
+            FuturesWebsocketEvent::AggrTrades(_) => "trade",
+            _ => "stop",
+        };
+        callback(CString::new(format!("{{\"type\":\"{}\",\"data\": {:?}}}", ctype, event)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
+unsafe {
+    for s in STREAMS.clone() {
+        println!("{}", s);
+    }
+}
     let keep_running = AtomicBool::new(true);
     let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
     unsafe {
@@ -116,8 +126,8 @@ pub extern "C" fn ws_user_data_rs(data: *mut c_void, callback: extern fn(_: *con
         loop {
                 thread::sleep(Duration::from_secs(1800));
                 match user_stream.keep_alive(&listen_key_clone) {
-                    Ok(msg) => continue,
-                    Err(e) => break,
+                    Ok(_msg) => continue,
+                    Err(_e) => break,
                 }
             }
         });
@@ -234,12 +244,13 @@ fn build_custom_order(
             &_ => panic!("unknown order side"),
         };
 
+        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
+
         let rs_reduce_only = match rs_order_type_str {
             "limit_maker" => Some(true),
             &_ => None,
         };
 
-        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
         let rs_order_type = match rs_order_type_str {
             "market" => OrderType::Market,
             "limit" => OrderType::Limit,

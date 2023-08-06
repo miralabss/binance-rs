@@ -55,6 +55,8 @@ pub enum Filters {
         min_price: String,
         max_price: String,
         tick_size: String,
+        #[serde(default)]
+        price_filter: String,
     },
     #[serde(rename = "PERCENT_PRICE")]
     #[serde(rename_all = "camelCase")]
@@ -62,6 +64,8 @@ pub enum Filters {
         multiplier_up: String,
         multiplier_down: String,
         avg_price_mins: Option<f64>,
+        #[serde(default)]
+        percent_price_filter: String,
     },
     #[serde(rename = "PERCENT_PRICE_BY_SIDE")]
     #[serde(rename_all = "camelCase")]
@@ -71,6 +75,8 @@ pub enum Filters {
         ask_multiplier_up: String,
         ask_multiplier_down: String,
         avg_price_mins: Option<f64>,
+        #[serde(default)]
+        percent_price_by_side_filter: String,
     },
     #[serde(rename = "LOT_SIZE")]
     #[serde(rename_all = "camelCase")]
@@ -78,6 +84,8 @@ pub enum Filters {
         min_qty: String,
         max_qty: String,
         step_size: String,
+        #[serde(default)]
+        lot_size_filter: String,
     },
     #[serde(rename = "MIN_NOTIONAL")]
     #[serde(rename_all = "camelCase")]
@@ -86,6 +94,8 @@ pub enum Filters {
         min_notional: Option<String>,
         apply_to_market: Option<bool>,
         avg_price_mins: Option<f64>,
+        #[serde(default)]
+        min_notional_filter: String,
     },
     #[serde(rename = "NOTIONAL")]
     #[serde(rename_all = "camelCase")]
@@ -94,28 +104,52 @@ pub enum Filters {
         min_notional: Option<String>,
         apply_to_market: Option<bool>,
         avg_price_mins: Option<f64>,
+        #[serde(default)]
+        notional_filter: String,
     },
     #[serde(rename = "ICEBERG_PARTS")]
     #[serde(rename_all = "camelCase")]
-    IcebergParts { limit: Option<u16> },
+    IcebergParts { 
+        limit: Option<u16>,
+        #[serde(default)]
+        iceberg_parts_filter: String
+    },
     #[serde(rename = "MAX_NUM_ORDERS")]
     #[serde(rename_all = "camelCase")]
-    MaxNumOrders { max_num_orders: Option<u16> },
+    MaxNumOrders {
+        max_num_orders: Option<u16>,
+        #[serde(default)]
+        max_num_orders_filter: String
+    },
     #[serde(rename = "MAX_NUM_ALGO_ORDERS")]
     #[serde(rename_all = "camelCase")]
-    MaxNumAlgoOrders { max_num_algo_orders: Option<u16> },
+    MaxNumAlgoOrders {
+        max_num_algo_orders: Option<u16>,
+        #[serde(default)]
+        max_num_algo_orders_filter: String
+    },
     #[serde(rename = "MAX_NUM_ICEBERG_ORDERS")]
     #[serde(rename_all = "camelCase")]
-    MaxNumIcebergOrders { max_num_iceberg_orders: u16 },
+    MaxNumIcebergOrders {
+        max_num_iceberg_orders: u16,
+        #[serde(default)]
+        max_num_iceberg_orders_filter: String
+    },
     #[serde(rename = "MAX_POSITION")]
     #[serde(rename_all = "camelCase")]
-    MaxPosition { max_position: String },
+    MaxPosition {
+        max_position: String,
+        #[serde(default)]
+        max_position_filter: String
+    },
     #[serde(rename = "MARKET_LOT_SIZE")]
     #[serde(rename_all = "camelCase")]
     MarketLotSize {
         min_qty: String,
         max_qty: String,
         step_size: String,
+        #[serde(default)]
+        market_lot_size_filter: String,
     },
     #[serde(rename = "TRAILING_DELTA")]
     #[serde(rename_all = "camelCase")]
@@ -124,6 +158,8 @@ pub enum Filters {
         max_trailing_above_delta: Option<u16>,
         min_trailing_below_delta: Option<u16>,
         max_trailing_below_delta: Option<u16>,
+        #[serde(default)]
+        trailing_delta_filter: String,
     },
 }
 

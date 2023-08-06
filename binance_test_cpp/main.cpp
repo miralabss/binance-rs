@@ -12,23 +12,23 @@ typedef char* (*F_10_C_STR)(const char*, const char*, const char*, const char*, 
 typedef int (*F_RUST_WITH_CB)(F_C_STR);
 typedef int (*F_1_RUST_WITH_CB)(const char*, void*, F_C_STR_CB);
 
-F_RUST_WITH_CB init_from_cpp_ = NULL;
-F_C_STR rust_from_cpp_ = NULL;
+F_RUST_WITH_CB init_from_cpp = NULL;
+F_C_STR rust_from_cpp = NULL;
 
-F_1_RUST_WITH_CB ws_order_book_rs_ = NULL;
-F_1_RUST_WITH_CB ws_mark_price_rs_ = NULL;
-F_1_RUST_WITH_CB ws_agg_trade_rs_ = NULL;
-F_2_C_STR cancel_order_with_client_id_rs_ = NULL;
-F_2_C_STR cancel_order_rs_ = NULL;
-F_10_C_STR new_order_rs_ = NULL;
-F_0_C_STR exchange_info_rs_ = NULL;
-F_0_C_STR account_balance_rs_ = NULL;
-F_2_C_STR get_custom_depth_rs_ = NULL;
-F_1_C_STR get_price_rs_ = NULL;
-F_1_C_STR get_book_ticker_rs_ = NULL;
-F_1_C_STR cancel_all_open_orders_rs_ = NULL;
+F_1_RUST_WITH_CB ws_order_book_rs = NULL;
+F_1_RUST_WITH_CB ws_mark_price_rs = NULL;
+F_1_RUST_WITH_CB ws_agg_trade_rs = NULL;
+F_2_C_STR cancel_order_with_client_id_rs = NULL;
+F_2_C_STR cancel_order_rs = NULL;
+F_10_C_STR new_order_rs = NULL;
+F_0_C_STR exchange_info_rs = NULL;
+F_0_C_STR account_balance_rs = NULL;
+F_2_C_STR get_custom_depth_rs = NULL;
+F_1_C_STR get_price_rs = NULL;
+F_1_C_STR get_book_ticker_rs = NULL;
+F_1_C_STR cancel_all_open_orders_rs = NULL;
 
-void* gHandler_LibBinance_ = NULL;
+void* gHandler_LibBinance = NULL;
 
 char* cppFromRust(const char* s) {
     printf("Received String From Rust : %s \n", s);
@@ -103,8 +103,7 @@ int close_library() {
     return 0;
 }
 
-char* cb(const char* input) {
-    printf("bebra\n");
+char* cb(const char* input, void* xyu) {
     printf("%s\n", input);
     return NULL;
 }
@@ -115,9 +114,11 @@ int main() {
         return -1;
     }
 
+    int synPizdy;
+
     init_from_cpp(rust_from_cpp);
 
-    ws_order_book_rs("btcusdt", cb);
+    ws_order_book_rs("btcusdt", (void*)&synPizdy, cb);
 //    printf("%s\n", get_custom_depth_rs("BTCUSDT", "5"));
 
     close_library();
