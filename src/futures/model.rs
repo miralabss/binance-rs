@@ -259,6 +259,8 @@ pub struct Transaction {
     pub avg_price: f64,
     #[serde(with = "string_or_float")]
     pub orig_qty: f64,
+    #[serde(with = "string_or_float")]
+    pub price: f64,
     pub reduce_only: bool,
     pub side: String,
     pub position_side: String,

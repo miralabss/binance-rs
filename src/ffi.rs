@@ -9,6 +9,7 @@ use crate::account::OrderSide;
 use crate::futures::general::FuturesGeneral;
 use crate::futures::websockets::*;
 use crate::futures::userstream::*;
+use crate::errors::ErrorKind as BinanceLibErrorKind;
 use std::sync::atomic::AtomicBool;
 use std::thread;
 use std::time::Duration;
@@ -27,10 +28,12 @@ static mut STREAMS: Vec<String> = vec![];
 ///
 /// Must be called at beginning
 /// 
-pub fn init() {
+pub fn init(api: *const c_char, secret: *const c_char) {
     unsafe {
-        API_KEY.get_or_insert_with(|| "yb3hgf0KliueblsrXcwDVgYhfmp7DzUK2m1Jzieg01QHRVCFpg4LBaF1VVYSByTC".to_owned());
-        SECRET_KEY.get_or_insert_with(|| "2yNjneC6MRR0Pt9OgzsC6DhygZGRt3yj6n5Pr0SmQB3i1GD2b9ArWynYzspHj5mw".to_owned());
+        let api_rs = CStr::from_ptr(api).to_str().unwrap();
+        let secret_rs = CStr::from_ptr(secret).to_str().unwrap();
+        API_KEY.get_or_insert_with(|| api_rs.to_owned());
+        SECRET_KEY.get_or_insert_with(|| secret_rs.to_owned());
         ACCOUNT.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
         GENERAL.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
         MARKET.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
@@ -38,11 +41,8 @@ pub fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn init_from_cpp(callback: extern fn(_: *const c_char) -> *mut c_char) -> i32 {
-    unsafe {
-        FUNC_CPP_FROM_RUST = callback;
-        init();
-    }
+pub extern "C" fn init_from_cpp(api: *const c_char, secret: *const c_char) -> i32 {
+    init(api, secret);
     0
 }
 
@@ -87,11 +87,11 @@ pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_ch
         callback(CString::new(format!("{{\"type\":\"{}\",\"data\": {:?}}}", ctype, event)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
-unsafe {
-    for s in STREAMS.clone() {
-        println!("{}", s);
+    unsafe {
+        for s in STREAMS.clone() {
+            println!("{}", s);
+        }
     }
-}
     let keep_running = AtomicBool::new(true);
     let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
     unsafe {
@@ -116,7 +116,8 @@ pub extern "C" fn ws_user_data_rs(data: *mut c_void, callback: extern fn(_: *con
         let listen_key_clone = listen_key.clone();
     
         let mut web_socket = FuturesWebSockets::new(|event: FuturesWebsocketEvent| {
-            callback(CString::new(format!("{:?}", event)).unwrap().into_raw() as *const c_char, data);
+            let res = format!("{:?}", event);
+            callback(CString::new(res).unwrap().into_raw() as *const c_char, data);
             Ok(())
         });
 
@@ -167,9 +168,15 @@ pub extern "C" fn cancel_order_with_client_id_rs(symbol: *const c_char, orig_cli
         let str_slice = cstr.to_str().expect("Invalid UTF-8 string");
         let rs_orig_client_order_id: String = String::from(str_slice);
         
-        let res= match ACCOUNT.as_mut().unwrap().cancel_order_with_client_id(rs_symbol, rs_orig_client_order_id) {
+        let res = match ACCOUNT.as_mut().unwrap().cancel_order_with_client_id(rs_symbol, rs_orig_client_order_id) {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
@@ -185,7 +192,13 @@ pub extern "C" fn cancel_order_rs(symbol: *const c_char, order_id: *const c_char
         
         let res = match ACCOUNT.as_mut().unwrap().cancel_order(rs_symbol, rs_order_id.parse::<u64>().unwrap()) {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
@@ -202,7 +215,8 @@ fn build_custom_order(
                     time_in_force: *const c_char,
                     activation_price: *const c_char,
                     callback_rate: *const c_char,
-                    close_position: *const c_char) -> CustomOrderRequest {
+                    close_position: *const c_char,
+                    reduce_only: *const c_char) -> CustomOrderRequest {
     unsafe {
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
 
@@ -244,13 +258,13 @@ fn build_custom_order(
             &_ => panic!("unknown order side"),
         };
 
-        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
-
-        let rs_reduce_only = match rs_order_type_str {
-            "limit_maker" => Some(true),
+        let rs_reduce_only_str = CStr::from_ptr(reduce_only).to_str().unwrap();
+        let rs_reduce_only = match rs_reduce_only_str {
+            "true" => Some(true),
             &_ => None,
         };
 
+        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
         let rs_order_type = match rs_order_type_str {
             "market" => OrderType::Market,
             "limit" => OrderType::Limit,
@@ -326,11 +340,20 @@ pub extern "C" fn custom_order_rs(
                     time_in_force: *const c_char,
                     activation_price: *const c_char,
                     callback_rate: *const c_char,
-                    close_position: *const c_char) -> *mut c_char {
+                    close_position: *const c_char,
+                    reduce_only: *const c_char) -> *mut c_char {
     unsafe {
-        let res = match ACCOUNT.as_mut().unwrap().custom_order(build_custom_order(symbol, order_type, order_side, qty, price, stop_price, time_in_force, activation_price, callback_rate, close_position)) {
+        let order = build_custom_order(symbol, order_type, order_side, qty, price, stop_price, time_in_force, activation_price, callback_rate, close_position, reduce_only);
+        let ores = ACCOUNT.as_mut().unwrap().custom_order(order);
+        let res = match ores {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
@@ -343,7 +366,13 @@ pub extern "C" fn exchange_info_rs() -> *mut c_char {
     unsafe {
         let res = match GENERAL.as_mut().unwrap().exchange_info() {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
@@ -355,7 +384,13 @@ pub extern "C" fn account_balance_rs() -> *mut c_char {
     unsafe {
         let res = match ACCOUNT.as_mut().unwrap().account_balance() {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
@@ -370,7 +405,13 @@ pub extern "C" fn cancel_all_open_orders_rs(symbol: *const c_char) -> *mut c_cha
 
         let res = match ACCOUNT.as_mut().unwrap().cancel_all_open_orders(rs_symbol) {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
@@ -386,7 +427,13 @@ pub extern "C" fn get_custom_depth_rs(symbol: *const c_char, depth: *const c_cha
 
         let res = match MARKET.as_mut().unwrap().get_custom_depth(rs_symbol, rs_depth.parse::<u64>().unwrap()) {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
@@ -401,7 +448,13 @@ pub extern "C" fn get_price_rs(symbol: *const c_char) -> *mut c_char {
 
         let res = match MARKET.as_mut().unwrap().get_price(rs_symbol) {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
@@ -416,7 +469,13 @@ pub extern "C" fn get_book_ticker_rs(symbol: *const c_char) -> *mut c_char {
 
         let res = match MARKET.as_mut().unwrap().get_book_ticker(rs_symbol) {
             Ok(answer) => format!("{:?}", answer),
-            Err(e) => format!("{{ec: 1, errmsg: \"{}\"}}", e.description()),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
