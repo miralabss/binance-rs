@@ -121,7 +121,9 @@ pub extern "C" fn ws_user_data_rs(data: *mut c_void, callback: extern fn(_: *con
             Ok(())
         });
 
-        web_socket.connect(&FuturesMarket::USDM, &listen_key).unwrap(); // check error
+        let user_streams = vec![listen_key.clone() + "@account", listen_key.clone() + "@balance"];
+
+        web_socket.connect_multiple_streams(&FuturesMarket::USDM, user_streams.borrow()).unwrap(); // check error
 
         thread::spawn(move || {
         loop {
@@ -264,7 +266,6 @@ fn build_custom_order(
             &_ => None,
         };
 
-        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
         let rs_order_type = match rs_order_type_str {
             "market" => OrderType::Market,
             "limit" => OrderType::Limit,
