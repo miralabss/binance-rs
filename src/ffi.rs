@@ -266,6 +266,7 @@ fn build_custom_order(
             &_ => None,
         };
 
+        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
         let rs_order_type = match rs_order_type_str {
             "market" => OrderType::Market,
             "limit" => OrderType::Limit,
@@ -380,7 +381,7 @@ pub extern "C" fn exchange_info_rs() -> *mut c_char {
 }
 
 #[no_mangle]
-// pub fn exchange_info(&self) -> Result<ExchangeInformation>
+// pub fn account_balance(&self) -> Result<ExchangeInformation>
 pub extern "C" fn account_balance_rs() -> *mut c_char {
     unsafe {
         let res = match ACCOUNT.as_mut().unwrap().account_balance() {
@@ -481,4 +482,30 @@ pub extern "C" fn get_book_ticker_rs(symbol: *const c_char) -> *mut c_char {
 
         CString::new(res).unwrap().into_raw() as *mut c_char
     }
+}
+
+#[no_mangle]
+// pub fn position_information<S>(&self, symbol: S) -> Result<Vec<PositionRisk>>
+pub extern "C" fn get_position_rs(symbol: *const c_char) -> *mut c_char {
+    unsafe {
+        let rs_symbol_str = CStr::from_ptr(symbol).to_str().unwrap();
+        let rs_symbol = match rs_symbol_str {
+            "" => None,
+            _ => Some(rs_symbol_str.to_string()),
+        };
+
+        let res = match ACCOUNT.as_mut().unwrap().position_information(rs_symbol) {
+            Ok(answer) => format!("{:?}", answer),
+            Err(e) => {
+                match e.0 {
+                    BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
+                    BinanceLibErrorKind::Msg(msg) => format!("{{ec: 1, errmsg: \"{}\"}}", msg),
+                    _ => format!("{{ec: 1, errmsg: \"{}\"}}", e.0),
+                }
+            },
+        };
+
+        CString::new(res).unwrap().into_raw() as *mut c_char
+    }
+
 }
