@@ -121,7 +121,7 @@ pub extern "C" fn ws_user_data_rs(data: *mut c_void, callback: extern fn(_: *con
             Ok(())
         });
 
-        let user_streams = vec![listen_key.clone() + "@account", listen_key.clone() + "@balance"];
+        let user_streams = vec![listen_key.clone()];
 
         web_socket.connect_multiple_streams(&FuturesMarket::USDM, user_streams.borrow()).unwrap(); // check error
 
@@ -406,7 +406,7 @@ pub extern "C" fn cancel_all_open_orders_rs(symbol: *const c_char) -> *mut c_cha
         let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
 
         let res = match ACCOUNT.as_mut().unwrap().cancel_all_open_orders(rs_symbol) {
-            Ok(answer) => format!("{:?}", answer),
+            Ok(answer) => format!("{{\"data\":[{:?}]}}", answer),
             Err(e) => {
                 match e.0 {
                     BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),
@@ -493,7 +493,6 @@ pub extern "C" fn get_position_rs(symbol: *const c_char) -> *mut c_char {
             "" => None,
             _ => Some(rs_symbol_str.to_string()),
         };
-
         let res = match ACCOUNT.as_mut().unwrap().position_information(rs_symbol) {
             Ok(answer) => format!("{:?}", answer),
             Err(e) => {
