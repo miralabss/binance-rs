@@ -81,15 +81,9 @@ pub extern "C" fn ws_mark_price_rs(symbol: *const c_char) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
-    let callback_fn = |event: FuturesWebsocketEvent| {
-        let ctype = match event {
-            FuturesWebsocketEvent::DepthOrderBook(_) => "depth",
-            FuturesWebsocketEvent::AggrTrades(_) => "trade",
-            FuturesWebsocketEvent::AccountUpdate(_) => "user",
-            FuturesWebsocketEvent::OrderTrade(_) => "user",
-            _ => "stop",
-        };
-        callback(CString::new(format!("{{\"type\":\"{}\",\"data\": {:?}}}", ctype, event)).unwrap().into_raw() as *const c_char, data);
+    let callback_fn = |msg: &str| {
+        println!("{}", msg);
+        // callback(CString::new(format!("{}", msg)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
     unsafe {

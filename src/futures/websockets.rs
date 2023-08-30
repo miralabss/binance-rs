@@ -75,7 +75,7 @@ pub enum FuturesWebsocketEvent {
 
 pub struct FuturesWebSockets<'a> {
     pub socket: Option<(WebSocket<MaybeTlsStream<TcpStream>>, Response)>,
-    handler: Box<dyn FnMut(FuturesWebsocketEvent) -> Result<()> + 'a>,
+    handler: Box<dyn FnMut(&str) -> Result<()> + 'a>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -105,7 +105,7 @@ enum FuturesEvents {
 impl<'a> FuturesWebSockets<'a> {
     pub fn new<Callback>(handler: Callback) -> FuturesWebSockets<'a>
     where
-        Callback: FnMut(FuturesWebsocketEvent) -> Result<()> + 'a,
+        Callback: FnMut(&str) -> Result<()> + 'a,
     {
         FuturesWebSockets {
             socket: None,
@@ -155,8 +155,9 @@ impl<'a> FuturesWebSockets<'a> {
     }
 
     fn handle_msg(&mut self, msg: &str) -> Result<()> {
-        let value: serde_json::Value = serde_json::from_str(msg)?;
-
+        (self.handler)(msg)?;
+/*      let value: serde_json::Value = serde_json::from_str(msg)?;
+ 
         if let Some(data) = value.get("data") {
             self.handle_msg(&data.to_string())?;
             return Ok(());
@@ -188,6 +189,7 @@ impl<'a> FuturesWebSockets<'a> {
             };
             (self.handler)(action)?;
         }
+*/
         Ok(())
     }
 
