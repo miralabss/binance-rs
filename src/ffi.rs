@@ -25,6 +25,8 @@ static mut ACCOUNT: Option<FuturesAccount> = None;
 static mut GENERAL: Option<FuturesGeneral> = None;
 static mut MARKET: Option<crate::futures::market::FuturesMarket> = None;
 static mut STREAMS: Vec<String> = vec![];
+static mut USER: Option<FuturesUserStream> = None;
+
 ///
 /// Must be called at beginning
 /// 
@@ -37,6 +39,7 @@ pub fn init(api: *const c_char, secret: *const c_char) {
         ACCOUNT.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
         GENERAL.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
         MARKET.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
+        USER.get_or_insert(Binance::new(API_KEY.clone(), SECRET_KEY.clone()));
     }
 }
 
@@ -50,7 +53,7 @@ pub extern "C" fn init_from_cpp(api: *const c_char, secret: *const c_char) -> i3
 pub extern "C" fn ws_order_book_rs(symbol: *const c_char) -> i32 {
     let rs_symbol: String;
     unsafe {
-        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth@0ms";
+        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth20@0ms";
         STREAMS.push(rs_symbol);
     }
     0
@@ -82,6 +85,8 @@ pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_ch
         let ctype = match event {
             FuturesWebsocketEvent::DepthOrderBook(_) => "depth",
             FuturesWebsocketEvent::AggrTrades(_) => "trade",
+            FuturesWebsocketEvent::AccountUpdate(_) => "user",
+            FuturesWebsocketEvent::OrderTrade(_) => "user",
             _ => "stop",
         };
         callback(CString::new(format!("{{\"type\":\"{}\",\"data\": {:?}}}", ctype, event)).unwrap().into_raw() as *const c_char, data);
@@ -105,48 +110,28 @@ pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn ws_user_data_rs(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
-    let keep_running = AtomicBool::new(true); 
-    let user_stream: FuturesUserStream;
+pub extern "C" fn ws_user_data_rs() -> i32 {
     unsafe {
-        user_stream = Binance::new(API_KEY.clone(), SECRET_KEY.clone());
-    }
-    if let Ok(answer) = user_stream.start() {
-        let listen_key = answer.listen_key;
-        let listen_key_clone = listen_key.clone();
-    
-        let mut web_socket = FuturesWebSockets::new(|event: FuturesWebsocketEvent| {
-            let res = format!("{:?}", event);
-            callback(CString::new(res).unwrap().into_raw() as *const c_char, data);
-            Ok(())
-        });
+        if let Ok(answer) = USER.as_mut().unwrap().start() {
+            let listen_key = answer.listen_key;
+            let listen_key_clone = listen_key.clone();
 
-        let user_streams = vec![listen_key.clone()];
+            STREAMS.push(listen_key.clone());
 
-        web_socket.connect_multiple_streams(&FuturesMarket::USDM, user_streams.borrow()).unwrap(); // check error
-
-        thread::spawn(move || {
-        loop {
-                thread::sleep(Duration::from_secs(1800));
-                match user_stream.keep_alive(&listen_key_clone) {
-                    Ok(_msg) => continue,
-                    Err(_e) => break,
+            thread::spawn(move || {
+            loop {
+                    thread::sleep(Duration::from_secs(1800));
+                    match USER.as_mut().unwrap().keep_alive(&listen_key_clone) {
+                        Ok(_msg) => continue,
+                        Err(_e) => break,
+                    }
                 }
-            }
-        });
-    
-
-        if let Err(e) = web_socket.event_loop(&keep_running) {
-            match e {
-                err => {
-                    println!("Error: {:?}", err);
-                }
-            }
+            });
+            return 0;
+        } else {
+            println!("Not able to start an User Stream (Check your API_KEY)");
+            return 1;
         }
-        return 0;
-    } else {
-        println!("Not able to start an User Stream (Check your API_KEY)");
-        return 1;
     }
 }
 
