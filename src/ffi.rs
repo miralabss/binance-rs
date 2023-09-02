@@ -53,7 +53,7 @@ pub extern "C" fn init_from_cpp(api: *const c_char, secret: *const c_char) -> i3
 pub extern "C" fn ws_order_book_rs(symbol: *const c_char) -> i32 {
     let rs_symbol: String;
     unsafe {
-        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth20@0ms";
+        rs_symbol = CStr::from_ptr(symbol).to_str().unwrap().to_owned() + "@depth@0ms";
         STREAMS.push(rs_symbol);
     }
     0
@@ -82,8 +82,7 @@ pub extern "C" fn ws_mark_price_rs(symbol: *const c_char) -> i32 {
 #[no_mangle]
 pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |msg: &str| {
-        println!("{}", msg);
-        // callback(CString::new(format!("{}", msg)).unwrap().into_raw() as *const c_char, data);
+        callback(CString::new(format!("{}", msg)).unwrap().into_raw() as *const c_char, data);
         Ok(())
     };
     unsafe {
