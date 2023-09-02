@@ -324,9 +324,9 @@ pub extern "C" fn custom_order_rs(
                     reduce_only: *const c_char) -> *mut c_char {
     unsafe {
         let order = build_custom_order(symbol, order_type, order_side, qty, price, stop_price, time_in_force, activation_price, callback_rate, close_position, reduce_only);
-        let ores = ACCOUNT.as_mut().unwrap().custom_order(order);
+        let ores = ACCOUNT.as_mut().unwrap().custom_order_fast(order);
         let res = match ores {
-            Ok(answer) => format!("{:?}", answer),
+            Ok(answer) => answer,
             Err(e) => {
                 match e.0 {
                     BinanceLibErrorKind::BinanceError(response) => format!("{{ec: \"{}\", errmsg: \"{}\"}}", response.code, response.msg),

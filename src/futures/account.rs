@@ -422,6 +422,30 @@ impl FuturesAccount {
     }
 
     // Custom order for for professional traders
+    pub fn custom_order_fast(&self, order_request: CustomOrderRequest) -> Result<String> {
+        let order = OrderRequest {
+            symbol: order_request.symbol,
+            side: order_request.side,
+            position_side: order_request.position_side,
+            order_type: order_request.order_type,
+            time_in_force: order_request.time_in_force,
+            qty: order_request.qty,
+            reduce_only: order_request.reduce_only,
+            price: order_request.price,
+            stop_price: order_request.stop_price,
+            close_position: order_request.close_position,
+            activation_price: order_request.activation_price,
+            callback_rate: order_request.callback_rate,
+            working_type: order_request.working_type,
+            price_protect: order_request.price_protect,
+        };
+        let order = self.build_order(order);
+        let request = build_signed_request(order, self.recv_window)?;
+        self.client
+            .post_signed_fast(API::Futures(Futures::Order), request)
+    }
+
+    // Custom order for for professional traders
     pub fn modify_order(&self, order_request: CustomOrderRequest) -> Result<Transaction> {
         let order = OrderRequest {
             symbol: order_request.symbol,

@@ -43,6 +43,17 @@ impl Client {
         self.handler(response)
     }
 
+    pub fn get_signed_fast(&self, endpoint: API, request: Option<String>) -> Result<String> {
+        let url = self.sign_request(endpoint, request);
+        let client = &self.inner_client;
+        let response = client
+            .get(url.as_str())
+            .headers(self.build_headers(true)?)
+            .send()?;
+
+        self.handler_fast(response)
+    }
+
     pub fn post_signed<T: DeserializeOwned>(&self, endpoint: API, request: String) -> Result<T> {
         let url = self.sign_request(endpoint, Some(request));
         let client = &self.inner_client;
@@ -52,6 +63,17 @@ impl Client {
             .send()?;
 
         self.handler(response)
+    }
+
+    pub fn post_signed_fast(&self, endpoint: API, request: String) -> Result<String> {
+        let url = self.sign_request(endpoint, Some(request));
+        let client = &self.inner_client;
+        let response = client
+            .post(url.as_str())
+            .headers(self.build_headers(true)?)
+            .send()?;
+
+        self.handler_fast(response)
     }
 
     pub fn delete_signed<T: DeserializeOwned>(
@@ -65,6 +87,17 @@ impl Client {
             .send()?;
 
         self.handler(response)
+    }
+
+    pub fn delete_signed_fast(&self, endpoint: API, request: Option<String>) -> Result<String> {
+        let url = self.sign_request(endpoint, request);
+        let client = &self.inner_client;
+        let response = client
+            .delete(url.as_str())
+            .headers(self.build_headers(true)?)
+            .send()?;
+
+        self.handler_fast(response)
     }
 
     pub fn get<T: DeserializeOwned>(&self, endpoint: API, request: Option<String>) -> Result<T> {
@@ -81,6 +114,20 @@ impl Client {
         self.handler(response)
     }
 
+    pub fn get_fast(&self, endpoint: API, request: Option<String>) -> Result<String> {
+        let mut url: String = format!("{}{}", self.host, String::from(endpoint));
+        if let Some(request) = request {
+            if !request.is_empty() {
+                url.push_str(format!("?{}", request).as_str());
+            }
+        }
+
+        let client = &self.inner_client;
+        let response = client.get(url.as_str()).send()?;
+
+        self.handler_fast(response)
+    }
+
     pub fn post<T: DeserializeOwned>(&self, endpoint: API) -> Result<T> {
         let url: String = format!("{}{}", self.host, String::from(endpoint));
 
@@ -93,6 +140,18 @@ impl Client {
         self.handler(response)
     }
 
+    pub fn post_fast(&self, endpoint: API) -> Result<String> {
+        let url: String = format!("{}{}", self.host, String::from(endpoint));
+
+        let client = &self.inner_client;
+        let response = client
+            .post(url.as_str())
+            .headers(self.build_headers(false)?)
+            .send()?;
+
+        self.handler_fast(response)
+    }
+
     pub fn put_signed<T: DeserializeOwned>(&self, endpoint: API, request: String) -> Result<T> {
         let url = self.sign_request(endpoint, Some(request));
 
@@ -103,6 +162,18 @@ impl Client {
             .send()?;
 
         self.handler(response)
+    }
+
+    pub fn put_signed_fast(&self, endpoint: API, request: String) -> Result<String> {
+        let url = self.sign_request(endpoint, Some(request));
+
+        let client = &self.inner_client;
+        let response = client
+            .put(url.as_str())
+            .headers(self.build_headers(false)?)
+            .send()?;
+
+        self.handler_fast(response)
     }
 
     pub fn put<T: DeserializeOwned>(&self, endpoint: API, listen_key: &str) -> Result<T> {
@@ -119,6 +190,20 @@ impl Client {
         self.handler(response)
     }
 
+    pub fn put_fast(&self, endpoint: API, listen_key: &str) -> Result<String> {
+        let url: String = format!("{}{}", self.host, String::from(endpoint));
+        let data: String = format!("listenKey={}", listen_key);
+
+        let client = &self.inner_client;
+        let response = client
+            .put(url.as_str())
+            .headers(self.build_headers(false)?)
+            .body(data)
+            .send()?;
+
+        self.handler_fast(response)
+    }
+
     pub fn delete<T: DeserializeOwned>(&self, endpoint: API, listen_key: &str) -> Result<T> {
         let url: String = format!("{}{}", self.host, String::from(endpoint));
         let data: String = format!("listenKey={}", listen_key);
@@ -131,6 +216,20 @@ impl Client {
             .send()?;
 
         self.handler(response)
+    }
+
+    pub fn delete_fast(&self, endpoint: API, listen_key: &str) -> Result<String> {
+        let url: String = format!("{}{}", self.host, String::from(endpoint));
+        let data: String = format!("listenKey={}", listen_key);
+
+        let client = &self.inner_client;
+        let response = client
+            .delete(url.as_str())
+            .headers(self.build_headers(false)?)
+            .body(data)
+            .send()?;
+
+        self.handler_fast(response)
     }
 
     // Request must be signed
@@ -171,6 +270,29 @@ impl Client {
     fn handler<T: DeserializeOwned>(&self, response: Response) -> Result<T> {
         match response.status() {
             StatusCode::OK => Ok(response.json::<T>()?),
+            StatusCode::INTERNAL_SERVER_ERROR => {
+                bail!("Internal Server Error");
+            }
+            StatusCode::SERVICE_UNAVAILABLE => {
+                bail!("Service Unavailable");
+            }
+            StatusCode::UNAUTHORIZED => {
+                bail!("Unauthorized");
+            }
+            StatusCode::BAD_REQUEST => {
+                let error: BinanceContentError = response.json()?;
+
+                Err(ErrorKind::BinanceError(error).into())
+            }
+            s => {
+                bail!(format!("Received response: {:?}", s));
+            }
+        }
+    }
+
+    fn handler_fast(&self, response: Response) -> Result<String> {
+        match response.status() {
+            StatusCode::OK => Ok(response.text()?),
             StatusCode::INTERNAL_SERVER_ERROR => {
                 bail!("Internal Server Error");
             }
