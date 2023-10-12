@@ -310,20 +310,9 @@ fn build_custom_order(
 #[no_mangle]
 // pub fn custom_order<S, F>(&self, symbol: S, qty: F, price: f64, stop_price: Option<f64>, order_side: OrderSide,
 //    order_type: OrderType, time_in_force: TimeInForce, new_client_order_id: Option<String>, ) -> Result<Transaction>
-pub extern "C" fn custom_order_rs(
-                    symbol: *const c_char,
-                    order_type: *const c_char, 
-                    order_side: *const c_char,
-                    qty: *const c_char,
-                    price: *const c_char,
-                    stop_price: *const c_char,
-                    time_in_force: *const c_char,
-                    activation_price: *const c_char,
-                    callback_rate: *const c_char,
-                    close_position: *const c_char,
-                    reduce_only: *const c_char) -> *mut c_char {
+pub extern "C" fn custom_order_rs(request: *const c_char) -> *mut c_char {
     unsafe {
-        let order = build_custom_order(symbol, order_type, order_side, qty, price, stop_price, time_in_force, activation_price, callback_rate, close_position, reduce_only);
+        let order = CStr::from_ptr(request).to_str().unwrap();
         let ores = ACCOUNT.as_mut().unwrap().custom_order_fast(order);
         let res = match ores {
             Ok(answer) => answer,
