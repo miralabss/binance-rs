@@ -5,7 +5,6 @@ use std::os::raw::{c_char, c_void};
 // use serde_json::Value;
 use crate::futures::account::*;
 use crate::api::Binance;
-use crate::account::OrderSide;
 use crate::futures::general::FuturesGeneral;
 use crate::futures::websockets::*;
 use crate::futures::userstream::*;
@@ -90,16 +89,22 @@ pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *mut c_char
             println!("{}", s);
         }
     }
-    let keep_running = AtomicBool::new(true);
-    let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
+    let streams: &[String];
     unsafe {
-        web_socket
-            .connect_multiple_streams(&FuturesMarket::USDM, STREAMS.borrow())
-            .unwrap();
+        streams = STREAMS.borrow();
     }
-    web_socket.event_loop(&keep_running).unwrap();
-    web_socket.disconnect().unwrap();
-    0
+    loop {
+        let keep_running = AtomicBool::new(true);
+        let mut web_socket: FuturesWebSockets<'_> = FuturesWebSockets::new(callback_fn);
+        web_socket
+            .connect_multiple_streams(&FuturesMarket::USDM, streams)
+            .unwrap();
+        if let Err(e) = web_socket.event_loop(&keep_running) {
+            println!("{}", e);
+            web_socket.disconnect().unwrap();
+            continue;
+        }
+    }
 }
 
 #[no_mangle]
@@ -182,128 +187,6 @@ pub extern "C" fn cancel_order_rs(symbol: *const c_char, order_id: *const c_char
         };
 
         CString::new(res).unwrap().into_raw() as *mut c_char
-    }
-}
-
-fn build_custom_order(
-                    symbol: *const c_char,
-                    order_type: *const c_char, 
-                    order_side: *const c_char,
-                    qty: *const c_char,
-                    price: *const c_char,
-                    stop_price: *const c_char,
-                    time_in_force: *const c_char,
-                    activation_price: *const c_char,
-                    callback_rate: *const c_char,
-                    close_position: *const c_char,
-                    reduce_only: *const c_char) -> CustomOrderRequest {
-    unsafe {
-        let rs_symbol = CStr::from_ptr(symbol).to_str().unwrap();
-
-        let rs_qty_str = CStr::from_ptr(qty).to_str().unwrap();
-        let mut rs_qty = match rs_qty_str {
-            "" => None,
-            _ => Some(rs_qty_str.parse::<f64>().unwrap()),
-        };
-
-        let rs_price_str = CStr::from_ptr(price).to_str().unwrap();
-        let rs_price = match rs_price_str {
-            "" => None,
-            _ => Some(rs_price_str.parse::<f64>().unwrap()),
-        };
-
-        let rs_stop_price_str = CStr::from_ptr(stop_price).to_str().unwrap();
-        let mut rs_stop_price = match rs_stop_price_str {
-            "" => None,
-            _ => Some(rs_stop_price_str.parse::<f64>().unwrap()),
-        };
-
-        let rs_callback_rate_str = CStr::from_ptr(callback_rate).to_str().unwrap();
-        let mut rs_callback_rate = match rs_callback_rate_str {
-            "" => None,
-            _ => Some(rs_callback_rate_str.parse::<f64>().unwrap()),
-        };
-
-
-        let rs_activation_price_str = CStr::from_ptr(activation_price).to_str().unwrap();
-        let mut rs_activation_price = match rs_activation_price_str {
-            "" => None,
-            _ => Some(rs_activation_price_str.parse::<f64>().unwrap()),
-        };
-
-        let rs_order_side_str = CStr::from_ptr(order_side).to_str().unwrap();
-        let rs_order_side = match rs_order_side_str {
-            "buy" => OrderSide::Buy,
-            "sell" => OrderSide::Sell,
-            &_ => panic!("unknown order side"),
-        };
-
-        let rs_reduce_only_str = CStr::from_ptr(reduce_only).to_str().unwrap();
-        let rs_reduce_only = match rs_reduce_only_str {
-            "true" => Some(true),
-            &_ => None,
-        };
-
-        let rs_order_type_str = CStr::from_ptr(order_type).to_str().unwrap();
-        let rs_order_type = match rs_order_type_str {
-            "market" => OrderType::Market,
-            "limit" => OrderType::Limit,
-            "limit_maker" => OrderType::Limit,
-            "stop" => OrderType::Stop,
-            "stop_market" => OrderType::StopMarket,
-            "take_profit" => OrderType::TakeProfit,
-            "take_profit_market" => OrderType::TakeProfitMarket,
-            "trailing_stop_market" => OrderType::TrailingStopMarket,
-            &_ => panic!("unknown order type"),
-        };
-
-        let rs_time_in_force_str: &str = CStr::from_ptr(time_in_force).to_str().unwrap();
-        let rs_time_in_force = match rs_time_in_force_str {
-            "gtc" => Some(TimeInForce::GTC),
-            "ioc" => Some(TimeInForce::IOC),
-            "fok" => Some(TimeInForce::FOK),
-            "gtx" => Some(TimeInForce::GTX),
-            &_ => None,
-        };
-
-        let rs_close_position_str: &str = CStr::from_ptr(close_position).to_str().unwrap();
-        let mut rs_close_position = match rs_close_position_str {
-            "" => None,
-            _ => Some(rs_close_position_str.parse::<bool>().unwrap()),
-        };
-
-        if rs_order_type_str != "stop_market" && rs_order_type_str != "take_profit_market" {
-            if rs_order_type_str != "stop" && rs_order_type_str != "take_profit" {
-                rs_stop_price = None;
-            }
-            rs_close_position = None;
-        }
-
-        if rs_order_type_str != "trailing_stop_market" {
-            rs_callback_rate = None;
-            rs_activation_price = None;
-        }
-
-        if rs_close_position == Some(true) {
-            rs_qty = None;
-        }
-        
-        CustomOrderRequest {
-            symbol: rs_symbol.to_owned(),
-            side: rs_order_side,
-            position_side: Some(PositionSide::Both),
-            order_type: rs_order_type,
-            time_in_force: rs_time_in_force,
-            qty: rs_qty,
-            reduce_only: rs_reduce_only,
-            price: rs_price,
-            stop_price: rs_stop_price,
-            close_position: rs_close_position,
-            activation_price: rs_activation_price,
-            callback_rate: rs_callback_rate,
-            working_type: None,
-            price_protect: None
-        }
     }
 }
 
