@@ -80,9 +80,9 @@ pub extern "C" fn ws_mark_price_rs(symbol: *const c_char) -> i32 {
 }
 
 #[no_mangle]
-pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *const c_char, __: *mut c_void) -> *mut c_char) -> i32 {
+pub extern "C" fn ws_start(data: *mut c_void, callback: extern fn(_: *mut c_char, __: *mut c_void) -> *mut c_char) -> i32 {
     let callback_fn = |msg: &str| {
-        callback(CString::new(format!("{}", msg)).unwrap().into_raw() as *const c_char, data);
+        callback(CString::new(format!("{}", msg)).unwrap().into_raw() as *mut c_char, data);
         Ok(())
     };
     unsafe {
