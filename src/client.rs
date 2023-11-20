@@ -292,7 +292,10 @@ impl Client {
 
     fn handler_fast(&self, response: Response) -> Result<String> {
         match response.status() {
-            StatusCode::OK => Ok(response.text()?),
+            StatusCode::OK => {
+                println!("{:?}", response.headers().get("x-response-time").unwrap());
+                Ok(response.text()?)
+            }
             StatusCode::INTERNAL_SERVER_ERROR => {
                 bail!("Internal Server Error");
             }
