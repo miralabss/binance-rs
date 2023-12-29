@@ -295,7 +295,7 @@ impl Client {
             StatusCode::OK => {
                 let s: String;
                 {
-                    s = format!("{:?}", response.headers().get("x-response-time"));
+                    s = format!("{:?}", response.headers().get("x-response-time").unwrap());
                 }
                 Ok(format!("{{\"body\":{}, \"latency\":{}}}", response.text()?, s))
             }
@@ -314,7 +314,7 @@ impl Client {
                 Err(ErrorKind::BinanceError(error).into())
             }
             s => {
-                bail!(format!("Received response: {:?}", s));
+                Ok(format!("{{\"errmsg\": \"Received response: {:?}\", \"ec\":{:?}}}", s, s))
             }
         }
     }
