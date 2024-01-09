@@ -285,7 +285,11 @@ impl Client {
                 Err(ErrorKind::BinanceError(error).into())
             }
             s => {
-                bail!(format!("Received response: {:?}", s));
+                let error = BinanceContentError {
+                    code: s.as_u16() as i16,
+                    msg:  format!("Received response: {:?}", s)
+                };
+                Err(ErrorKind::BinanceError(error).into())
             }
         }
     }
